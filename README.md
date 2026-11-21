@@ -40,3 +40,6 @@ SSH_PUBLIC_KEY=~/.ssh/dilemma_oci.pub bash infra/provision.sh
 | `OCI_HOST` | Public IP of the VM |
 | `OCI_SSH_PRIVATE_KEY` | Private SSH key matching the key installed on the VM |
 | `ADMIN_PASSWORD` | Password for `/admin` |
+
+Repository variable (optional): `CUSTOM_DOMAIN` — e.g. `dilemma.yonatankatz.com`. Needs a DNS
+`A` record pointing at `OCI_HOST`; Caddy then issues a Let's Encrypt certificate for it automatically.

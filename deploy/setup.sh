@@ -10,7 +10,11 @@ APP_DIR=/opt/dilemma/app
 DATA_DIR=/var/lib/dilemma
 PUBLIC_HOST="${PUBLIC_HOST:?PUBLIC_HOST (server public IP) is required}"
 # Free HTTPS hostname that resolves to the server IP, e.g. 1-2-3-4.sslip.io
-DOMAIN="${DOMAIN:-${PUBLIC_HOST//./-}.sslip.io}"
+SSLIP_DOMAIN="${PUBLIC_HOST//./-}.sslip.io"
+# Optional custom domain (its DNS A record must point at PUBLIC_HOST), e.g. dilemma.example.com
+CUSTOM_DOMAIN="${CUSTOM_DOMAIN:-}"
+DOMAIN="${CUSTOM_DOMAIN:-$SSLIP_DOMAIN}"
+SITE_ADDRESSES="$SSLIP_DOMAIN${CUSTOM_DOMAIN:+, $CUSTOM_DOMAIN}"
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -96,8 +100,8 @@ EOF
 
 # ---------- reverse proxy ----------
 cat > /etc/caddy/Caddyfile <<EOF
-# HTTPS via Let's Encrypt on the free sslip.io hostname
-$DOMAIN {
+# HTTPS via Let's Encrypt (sslip.io hostname + optional custom domain)
+$SITE_ADDRESSES {
 	encode gzip
 	reverse_proxy 127.0.0.1:3000
 }

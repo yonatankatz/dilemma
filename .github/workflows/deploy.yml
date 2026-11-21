@@ -47,7 +47,8 @@ jobs:
       - name: Install & restart
         env:
           HOST: ${{ secrets.OCI_HOST }}
-        run: ssh ubuntu@"$HOST" "sudo PUBLIC_HOST=$HOST bash ~/dilemma-release/deploy/setup.sh"
+          CUSTOM_DOMAIN: ${{ vars.CUSTOM_DOMAIN }}
+        run: ssh ubuntu@"$HOST" "sudo PUBLIC_HOST=$HOST CUSTOM_DOMAIN=$CUSTOM_DOMAIN bash ~/dilemma-release/deploy/setup.sh"
 
       - name: Smoke test
         env:
