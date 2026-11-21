@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>דילמה — ניהול</title>
+<style>
+  :root {
+    --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0;
+    --one: #2563eb; --two: #e11d48;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0b1120; --card: #111827; --text: #f1f5f9; --muted: #94a3b8; --border: #1f2937; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 1.6rem; }
+  .live { color: var(--muted); font-size: .9rem; }
+  .live::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22c55e; margin-inline-end: 6px; vertical-align: middle; }
+  .live.off::before { background: #f59e0b; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+  .opt { text-align: center; }
+  .opt .label { font-size: 1rem; color: var(--muted); }
+  .opt .num { font-size: clamp(3rem, 14vw, 5.5rem); font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .opt .pct { font-size: 1.1rem; font-weight: 600; }
+  .opt.one .num, .opt.one .pct { color: var(--one); }
+  .opt.two .num, .opt.two .pct { color: var(--two); }
+  .bar { display: flex; height: 22px; border-radius: 999px; overflow: hidden; background: var(--border); margin-top: 16px; }
+  .bar div { transition: width .4s ease; }
+  .bar .b1 { background: var(--one); }
+  .bar .b2 { background: var(--two); }
+  .total { margin-top: 16px; text-align: center; color: var(--muted); font-size: 1.05rem; }
+  .total b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .actions { margin-top: 28px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  button { font: inherit; padding: 10px 18px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; }
+  button.danger { border-color: #ef4444; color: #ef4444; }
+  .link { margin-top: 20px; text-align: center; color: var(--muted); font-size: .9rem; word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>תוצאות ההצבעה</h1>
+    <span id="live" class="live">מתעדכן בזמן אמת</span>
+  </header>
+
+  <div class="grid">
+    <div class="card opt one"><div class="label">הצביעו</div><div class="num" id="n1">0</div><div class="pct" id="p1">0%</div></div>
+    <div class="card opt two"><div class="label">הצביעו</div><div class="num" id="n2">0</div><div class="pct" id="p2">0%</div></div>
+  </div>
+
+  <div class="bar" aria-hidden="true"><div class="b1" id="bar1" style="width:50%"></div><div class="b2" id="bar2" style="width:50%"></div></div>
+  <div class="total">סה״כ מצביעים: <b id="total">0</b></div>
+
+  <div class="actions">
+    <button id="reset" class="danger">איפוס הצבעות</button>
+  </div>
+  <div class="link">קישור להצבעה: <span id="voteUrl"></span></div>
+</div>
+<script>
+  const $ = id => document.getElementById(id);
+  $('voteUrl').textContent = location.origin + '/';
+
+  function render(d) {
+    $('n1').textContent = d.one;
+    $('n2').textContent = d.two;
+    $('total').textContent = d.total;
+    const p1 = d.total ? Math.round(d.one / d.total * 100) : 0;
+    const p2 = d.total ? 100 - p1 : 0;
+    $('p1').textContent = p1 + '%';
+    $('p2').textContent = p2 + '%';
+    $('bar1').style.width = (d.total ? p1 : 50) + '%';
+    $('bar2').style.width = (d.total ? p2 : 50) + '%';
+  }
+
+  async function refresh() {
+    try {
+      const r = await fetch('/admin/api/results', { cache: 'no-store' });
+      if (!r.ok) throw new Error();
+      render(await r.json());
+      $('live').classList.remove('off');
+      $('live').textContent = 'מתעדכן בזמן אמת';
+    } catch {
+      $('live').classList.add('off');
+      $('live').textContent = 'אין חיבור…';
+    }
+  }
+
+  $('reset').addEventListener('click', async () => {
+    if (!confirm('לאפס את כל ההצבעות?')) return;
+    const r = await fetch('/admin/api/reset', { method: 'POST' });
+    if (r.ok) render(await r.json());
+  });
+
+  refresh();
+  setInterval(refresh, 2000);
+</script>
+</body>
+</html>

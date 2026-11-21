@@ -1,0 +1,60 @@
+name: Deploy to Oracle Cloud
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check app syntax
+        run: node --check app/server.js
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.OCI_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -T 15 -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Upload release
+        env:
+          HOST: ${{ secrets.OCI_HOST }}
+        run: |
+          tar czf release.tgz app deploy
+          scp -q release.tgz ubuntu@"$HOST":/tmp/dilemma-release.tgz
+          ssh ubuntu@"$HOST" 'rm -rf ~/dilemma-release && mkdir -p ~/dilemma-release && tar xzf /tmp/dilemma-release.tgz -C ~/dilemma-release && rm /tmp/dilemma-release.tgz'
+
+      - name: Write secrets on server
+        env:
+          HOST: ${{ secrets.OCI_HOST }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          printf 'ADMIN_PASSWORD=%s\n' "$ADMIN_PASSWORD" \
+            | ssh ubuntu@"$HOST" 'sudo install -m 600 /dev/stdin /etc/dilemma.env'
+
+      - name: Install & restart
+        env:
+          HOST: ${{ secrets.OCI_HOST }}
+        run: ssh ubuntu@"$HOST" "sudo PUBLIC_HOST=$HOST bash ~/dilemma-release/deploy/setup.sh"
+
+      - name: Smoke test
+        env:
+          HOST: ${{ secrets.OCI_HOST }}
+        run: |
+          for i in $(seq 1 10); do
+            curl -fsS "http://$HOST/healthz" && exit 0
+            sleep 3
+          done
+          exit 1
