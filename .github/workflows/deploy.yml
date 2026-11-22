@@ -15,8 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Check app syntax
-        run: node --check app/server.js
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 18 # same major as the server (Ubuntu 24.04 apt nodejs)
+
+      - name: Syntax check + unit tests
+        working-directory: app
+        run: |
+          for f in server.js lib/*.js public/js/*.js; do node --check "$f"; done
+          node --test
 
       - name: Configure SSH
         env:

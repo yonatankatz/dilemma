@@ -59,7 +59,8 @@ netfilter-persistent save >/dev/null
 # ---------- app ----------
 id dilemma >/dev/null 2>&1 || useradd --system --home /opt/dilemma --shell /usr/sbin/nologin dilemma
 mkdir -p "$APP_DIR" "$DATA_DIR"
-chown dilemma:dilemma "$DATA_DIR"
+chown -R dilemma:dilemma "$DATA_DIR"
+rm -f "$DATA_DIR/votes.json"  # legacy file from the first 1/2 voting version
 log "Copying app to $APP_DIR"
 rm -rf "$APP_DIR.new"
 cp -r "$RELEASE_DIR/app" "$APP_DIR.new"
@@ -84,7 +85,7 @@ WorkingDirectory=$APP_DIR
 EnvironmentFile=/etc/dilemma.env
 Environment=PORT=3000
 Environment=HOST=127.0.0.1
-Environment=DATA_FILE=$DATA_DIR/votes.json
+Environment=DATA_DIR=$DATA_DIR
 ExecStart=/usr/bin/node $APP_DIR/server.js
 Restart=always
 RestartSec=2
@@ -100,9 +101,9 @@ EOF
 
 # ---------- reverse proxy ----------
 cat > /etc/caddy/Caddyfile <<EOF
-# HTTPS via Let's Encrypt (sslip.io hostname + optional custom domain)
+# HTTPS via Let's Encrypt (sslip.io hostname + optional custom domain).
+# No "encode gzip": compression can buffer the Server-Sent Events stream.
 $SITE_ADDRESSES {
-	encode gzip
 	reverse_proxy 127.0.0.1:3000
 }
 

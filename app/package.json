@@ -1,0 +1,10 @@
+{
+  "name": "dilemma",
+  "private": true,
+  "description": "Live dilemma voting game: phones vote 1/2, a big screen runs the show.",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}

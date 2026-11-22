@@ -3,100 +3,145 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>דילמה — ניהול</title>
+<title>ניהול המשחק</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=Suez+One&display=swap">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2230%22 cy=%2250%22 r=%2228%22 fill=%22%23c8102e%22/%3E%3Ccircle cx=%2270%22 cy=%2250%22 r=%2228%22 fill=%22%23e8b64c%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/css/theme.css">
 <style>
-  :root {
-    --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0;
-    --one: #2563eb; --two: #e11d48;
+  body { background: var(--bg-grad) fixed, var(--wine); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 80px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  header h1 { font-family: var(--display); font-weight: 400; font-size: 2.2rem; margin: 0; }
+  .panel {
+    background: rgba(20, 3, 10, .55); border: 1px solid var(--line); border-radius: 18px;
+    padding: 20px; margin-bottom: 18px; animation: fadeUp .5s var(--ease-out) both;
   }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #0b1120; --card: #111827; --text: #f1f5f9; --muted: #94a3b8; --border: #1f2937; }
+  .panel h2 { font-family: var(--display); font-weight: 400; color: var(--gold-hi); margin: 0 0 14px; font-size: 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .hint { color: var(--muted); font-size: .95rem; margin: 0 0 12px; }
+
+  /* game */
+  .game-grid { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; }
+  @media (max-width: 640px) { .game-grid { grid-template-columns: 1fr; } }
+  .status { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .pill { background: rgba(246,232,204,.08); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-weight: 700; }
+  .pill b { color: var(--gold-hi); }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .qr { background: var(--cream); padding: 10px; border-radius: 14px; text-align: center; }
+  .qr svg { width: 150px; height: 150px; display: block; }
+  .qr a { color: var(--wine); font-weight: 800; font-size: .85rem; direction: ltr; display: block; margin-top: 4px; text-decoration: none; }
+
+  /* dilemmas */
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .item {
+    display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: start;
+    background: rgba(246,232,204,.05); border: 1px solid rgba(232,182,76,.15); border-radius: 14px; padding: 12px 14px;
+    transition: opacity .2s, transform .2s;
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
-  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  h1 { margin: 0; font-size: 1.6rem; }
-  .live { color: var(--muted); font-size: .9rem; }
-  .live::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22c55e; margin-inline-end: 6px; vertical-align: middle; }
-  .live.off::before { background: #f59e0b; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
-  .opt { text-align: center; }
-  .opt .label { font-size: 1rem; color: var(--muted); }
-  .opt .num { font-size: clamp(3rem, 14vw, 5.5rem); font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .opt .pct { font-size: 1.1rem; font-weight: 600; }
-  .opt.one .num, .opt.one .pct { color: var(--one); }
-  .opt.two .num, .opt.two .pct { color: var(--two); }
-  .bar { display: flex; height: 22px; border-radius: 999px; overflow: hidden; background: var(--border); margin-top: 16px; }
-  .bar div { transition: width .4s ease; }
-  .bar .b1 { background: var(--one); }
-  .bar .b2 { background: var(--two); }
-  .total { margin-top: 16px; text-align: center; color: var(--muted); font-size: 1.05rem; }
-  .total b { color: var(--text); font-variant-numeric: tabular-nums; }
-  .actions { margin-top: 28px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-  button { font: inherit; padding: 10px 18px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; }
-  button.danger { border-color: #ef4444; color: #ef4444; }
-  .link { margin-top: 20px; text-align: center; color: var(--muted); font-size: .9rem; word-break: break-all; }
+  .item.off { opacity: .5; }
+  .item .idx { font-family: var(--display); color: var(--gold); font-size: 1.3rem; text-align: center; }
+  .item .text { font-weight: 700; font-size: 1.08rem; line-height: 1.4; }
+  .item .opts { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; color: var(--muted); }
+  .item .opts span { display: inline-flex; align-items: center; gap: 6px; }
+  .item .opts .badge { width: 22px; height: 22px; font-size: .8rem; box-shadow: none; }
+  .tools { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  .tool { background: transparent; border: 1px solid var(--line); color: var(--cream); border-radius: 10px; width: 34px; height: 34px; cursor: pointer; font-size: 1rem; }
+  .tool:hover { background: rgba(246,232,204,.1); }
+  .tool:disabled { opacity: .3; cursor: default; }
+
+  form.edit { display: grid; gap: 10px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
+  label { display: grid; gap: 4px; font-weight: 700; font-size: .95rem; color: var(--muted); }
+  input, textarea {
+    font: 600 1.02rem var(--body); color: var(--cream); background: rgba(20,3,10,.6);
+    border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%;
+  }
+  input:focus, textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(232,182,76,.2); }
+  textarea { resize: vertical; min-height: 70px; line-height: 1.45; }
+  input[type=number] { width: 120px; }
+  .form-actions { display: flex; gap: 8px; }
+
+  /* settings */
+  .settings-grid { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 16px; }
+  .seg-row { display: grid; grid-template-columns: 160px 1fr 34px; gap: 10px; align-items: end; margin-bottom: 10px; }
+  @media (max-width: 560px) { .seg-row { grid-template-columns: 1fr; } }
+
+  .saved { color: #9be3a5; font-weight: 700; opacity: 0; transition: opacity .3s; font-size: .95rem; }
+  .saved.show { opacity: 1; }
+  .err { color: #ff9aaa; font-weight: 700; }
+  details summary { cursor: pointer; color: var(--gold-hi); font-weight: 700; margin: 6px 0; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translate(-50%, 20px); opacity: 0; transition: .25s var(--ease-out); background: var(--ink); color: var(--cream); border: 1px solid var(--line); padding: 10px 18px; border-radius: 999px; font-weight: 700; z-index: 10; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>תוצאות ההצבעה</h1>
-    <span id="live" class="live">מתעדכן בזמן אמת</span>
+    <h1 class="gold-text">ניהול המשחק</h1>
+    <a class="btn" href="/admin/host" target="_blank">🖥️ פתיחת מסך המשחק</a>
   </header>
 
-  <div class="grid">
-    <div class="card opt one"><div class="label">הצביעו</div><div class="num" id="n1">0</div><div class="pct" id="p1">0%</div></div>
-    <div class="card opt two"><div class="label">הצביעו</div><div class="num" id="n2">0</div><div class="pct" id="p2">0%</div></div>
-  </div>
+  <section class="panel">
+    <h2>משחק נוכחי</h2>
+    <div class="game-grid">
+      <div>
+        <div class="status" id="status"></div>
+        <div class="actions">
+          <button class="btn" id="newGame">✨ משחק חדש</button>
+          <button class="btn ghost" id="endGame">⏹ סיום משחק</button>
+          <a class="btn ghost" id="csv" href="/admin/api/game/results.csv">⬇ תוצאות (CSV)</a>
+        </div>
+        <p class="hint" style="margin-top:12px">"משחק חדש" לוקח את הדילמות הפעילות וההגדרות הנוכחיות, ופותח לובי עם QR. את המשחק עצמו מריצים ממסך המשחק.</p>
+      </div>
+      <div class="qr" id="qr"></div>
+    </div>
+  </section>
 
-  <div class="bar" aria-hidden="true"><div class="b1" id="bar1" style="width:50%"></div><div class="b2" id="bar2" style="width:50%"></div></div>
-  <div class="total">סה״כ מצביעים: <b id="total">0</b></div>
+  <section class="panel">
+    <h2><span>דילמות <span id="dcount" class="hint"></span></span><span class="saved" id="dsaved">נשמר ✓</span></h2>
+    <div class="list" id="list"></div>
 
-  <div class="actions">
-    <button id="reset" class="danger">איפוס הצבעות</button>
-  </div>
-  <div class="link">קישור להצבעה: <span id="voteUrl"></span></div>
+    <h2 style="margin-top:22px;font-size:1.25rem">הוספת דילמה</h2>
+    <form class="edit" id="addForm">
+      <label>הדילמה<textarea name="text" required maxlength="600" placeholder="לדוגמה: מצאתם ארנק עם כסף ברחוב…"></textarea></label>
+      <div class="row2">
+        <label>אפשרות 1<input name="option1" required maxlength="120" placeholder="אחזיר"></label>
+        <label>אפשרות 2<input name="option2" required maxlength="120" placeholder="אשאיר"></label>
+      </div>
+      <div class="form-actions"><button class="btn" type="submit">➕ הוספה</button></div>
+    </form>
+
+    <details style="margin-top:16px">
+      <summary>הוספה מרובה (הדבקת רשימה)</summary>
+      <p class="hint">שורה לכל דילמה, בפורמט: <b>דילמה | אפשרות 1 | אפשרות 2</b></p>
+      <textarea id="bulk" rows="6" placeholder="מצאתם ארנק ברחוב | אחזיר | אשאיר"></textarea>
+      <div class="form-actions" style="margin-top:8px"><button class="btn ghost" id="bulkAdd" type="button">הוספת כולן</button><span class="err" id="bulkErr"></span></div>
+    </details>
+  </section>
+
+  <section class="panel">
+    <h2><span>הגדרות</span><span class="saved" id="ssaved">נשמר ✓</span></h2>
+    <p class="hint">ההגדרות נכנסות לתוקף במשחק החדש הבא.</p>
+    <form id="settingsForm">
+      <div class="settings-grid">
+        <label>זמן הצבעה (שניות)<input type="number" name="voteSeconds" min="3" max="300" required></label>
+        <label>השהיה לפני הפילוח (שניות)<input type="number" name="breakdownDelaySeconds" min="0" max="30" required></label>
+      </div>
+      <h3 style="margin:8px 0 6px;color:var(--gold-hi)">שאלות פילוח</h3>
+      <p class="hint">המשתתפים עונים עליהן פעם אחת כשהם מצטרפים, והתוצאות מוצגות גם לפיהן. אפשרויות מופרדות בפסיק.</p>
+      <div id="segs"></div>
+      <div class="form-actions">
+        <button class="btn ghost" type="button" id="addSeg">➕ שאלת פילוח</button>
+        <button class="btn" type="submit">שמירת הגדרות</button>
+        <span class="err" id="settingsErr"></span>
+      </div>
+    </form>
+  </section>
 </div>
-<script>
-  const $ = id => document.getElementById(id);
-  $('voteUrl').textContent = location.origin + '/';
-
-  function render(d) {
-    $('n1').textContent = d.one;
-    $('n2').textContent = d.two;
-    $('total').textContent = d.total;
-    const p1 = d.total ? Math.round(d.one / d.total * 100) : 0;
-    const p2 = d.total ? 100 - p1 : 0;
-    $('p1').textContent = p1 + '%';
-    $('p2').textContent = p2 + '%';
-    $('bar1').style.width = (d.total ? p1 : 50) + '%';
-    $('bar2').style.width = (d.total ? p2 : 50) + '%';
-  }
-
-  async function refresh() {
-    try {
-      const r = await fetch('/admin/api/results', { cache: 'no-store' });
-      if (!r.ok) throw new Error();
-      render(await r.json());
-      $('live').classList.remove('off');
-      $('live').textContent = 'מתעדכן בזמן אמת';
-    } catch {
-      $('live').classList.add('off');
-      $('live').textContent = 'אין חיבור…';
-    }
-  }
-
-  $('reset').addEventListener('click', async () => {
-    if (!confirm('לאפס את כל ההצבעות?')) return;
-    const r = await fetch('/admin/api/reset', { method: 'POST' });
-    if (r.ok) render(await r.json());
-  });
-
-  refresh();
-  setInterval(refresh, 2000);
-</script>
+<div class="toast" id="toast"></div>
+<script src="/vendor/qrcode.js"></script>
+<script src="/js/admin.js"></script>
 </body>
 </html>

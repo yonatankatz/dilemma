@@ -1,0 +1,100 @@
+/* Shared design tokens: deep wine / bordeaux backgrounds, gold accents, cream text. */
+:root {
+  --ink: #14030a;
+  --wine: #2a0610;
+  --bordeaux: #5a0918;
+  --crimson: #8e1226;
+  --red: #c8102e;
+  --red-hi: #e8344f;
+  --gold: #e8b64c;
+  --gold-hi: #f7d77a;
+  --gold-deep: #c18a2c;
+  --cream: #f6e8cc;
+  --muted: #cbb193;
+  --line: rgba(232, 182, 76, 0.28);
+
+  --gold-grad: linear-gradient(180deg, #f7d77a 0%, #d9a23e 28%, #f3cf6c 52%, #c18a2c 80%, #ecc25e 100%);
+  --red-grad: linear-gradient(180deg, #e8344f 0%, #c8102e 45%, #8e1226 100%);
+  --bg-grad: radial-gradient(ellipse at 50% 35%, #701026 0%, #560818 45%, #2a0610 85%, #14030a 100%);
+
+  /* Option colors: 1 = red, 2 = gold */
+  --opt1: var(--red);
+  --opt1-grad: var(--red-grad);
+  --opt2: var(--gold);
+  --opt2-grad: var(--gold-grad);
+
+  --display: "Suez One", "Assistant", serif;
+  --body: "Assistant", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--wine);
+  color: var(--cream);
+  font-family: var(--body);
+}
+
+body.stage {
+  background: var(--bg-grad) fixed, var(--wine);
+  overflow: hidden;
+}
+
+/* Subtle grain so big flat areas feel less digital */
+body.stage::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.06) 0 1px, transparent 1px 4px);
+  z-index: 0;
+}
+
+.display { font-family: var(--display); font-weight: 400; }
+
+.gold-text {
+  background: var(--gold-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.badge {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  font-family: var(--display);
+  line-height: 1;
+  flex: none;
+}
+.badge.o1 { background: var(--opt1-grad); color: var(--cream); box-shadow: 0 0 0 3px rgba(246, 232, 204, 0.25), 0 6px 18px rgba(0, 0, 0, 0.4); }
+.badge.o2 { background: var(--opt2-grad); color: var(--wine); box-shadow: 0 0 0 3px rgba(246, 232, 204, 0.25), 0 6px 18px rgba(0, 0, 0, 0.4); }
+
+.btn {
+  font: 700 1.05rem var(--body);
+  text-decoration: none;
+  display: inline-block;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.8em 1.6em;
+  cursor: pointer;
+  color: var(--wine);
+  background: var(--gold-grad);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+  transition: transform 0.15s var(--ease-out), filter 0.15s, opacity 0.2s;
+}
+.btn:hover { filter: brightness(1.06); }
+.btn:active { transform: scale(0.96); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn.ghost { background: rgba(246, 232, 204, 0.08); color: var(--cream); box-shadow: inset 0 0 0 1.5px var(--line); }
+.btn.danger { background: transparent; color: #ff8a9b; box-shadow: inset 0 0 0 1.5px rgba(255, 138, 155, 0.6); }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes popIn { 0% { opacity: 0; transform: scale(0.6); } 70% { opacity: 1; transform: scale(1.08); } 100% { transform: scale(1); } }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@keyframes spin { to { transform: rotate(360deg); } }
