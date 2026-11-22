@@ -71,7 +71,7 @@
       case 'lobby': return 'wait:lobby';
       case 'vote': {
         const c = myChoice();
-        if (c) return `wait:voted:${c}:${state.index}`;
+        if (c) return `wait:voted:${state.index}`;
         return remainingMs() > 0 ? `vote:${state.gameId}:${state.index}` : 'wait:timeup';
       }
       case 'guess': return 'wait:guess';
@@ -98,7 +98,7 @@
   }
 
   function build(key) {
-    const [kind, variant, extra] = key.split(':');
+    const [kind, variant] = key.split(':');
     if (kind === 'vote') return buildVote();
     if (kind === 'join') return buildJoin();
     if (kind === 'nogame') {
@@ -107,7 +107,7 @@
     if (kind === 'loading') return h('div', { class: 'screen wait' }, h('div', { class: 'dots' }, h('i'), h('i'), h('i')));
     switch (variant) {
       case 'lobby': return waitScreen('🎉', 'אתם בפנים!', 'המשחק יתחיל בעוד רגע. כשתופיע דילמה — הכפתורים יופיעו כאן.');
-      case 'voted': return votedScreen(extra);
+      case 'voted': return votedScreen();
       case 'timeup': return waitScreen('⌛', 'הזמן נגמר', 'לא נורא — תוכלו להצביע בדילמה הבאה.');
       case 'guess': return waitScreen('🤔', 'מה לדעתכם הרוב בחרו?', 'הסתכלו על המסך הגדול ונחשו.');
       case 'results': return waitScreen('👀', 'התוצאות על המסך!', 'מחכים לדילמה הבאה…');
@@ -124,9 +124,10 @@
       dots ? h('div', { class: 'dots' }, h('i'), h('i'), h('i')) : null);
   }
 
-  function votedScreen(choice) {
+  // Deliberately does not reveal which option was chosen (people around can see the screen).
+  function votedScreen() {
     return h('div', { class: 'screen wait' },
-      h('div', { class: `badge chosen o${choice}` }, choice),
+      h('div', { class: 'emoji' }, '✅'),
       h('div', { class: 'big gold-text' }, 'ההצבעה נקלטה!'),
       h('div', { class: 'sub' }, 'מחכים שכולם יצביעו…'),
       h('div', { class: 'dots' }, h('i'), h('i'), h('i')));

@@ -6,8 +6,8 @@ const DEFAULT_SETTINGS = {
   voteSeconds: 20,
   breakdownDelaySeconds: 3,
   segments: [
-    { id: 'age', label: 'גיל', options: ['עד 18', '18–30', '31–50', '51+'] },
-    { id: 'sector', label: 'מגזר', options: ['חרדי', 'דתי לאומי', 'אחר'] },
+    { id: 'age', label: 'גיל', options: ['מתחת ל-60', '60 ומעלה'] },
+    { id: 'sector', label: 'מגזר', options: ['חרדי', 'דתי לאומי'] },
   ],
 };
 

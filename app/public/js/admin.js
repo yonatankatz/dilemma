@@ -182,7 +182,7 @@
   function segRow(seg = { label: '', options: [] }) {
     const label = h('input', { placeholder: 'למשל: גיל', maxlength: 40 });
     label.value = seg.label;
-    const opts = h('input', { placeholder: 'עד 18, 18–30, 31–50, 51+' });
+    const opts = h('input', { placeholder: 'מתחת ל-60, 60 ומעלה' });
     opts.value = seg.options.join(', ');
     const row = h('div', { class: 'seg-row' },
       h('label', {}, 'כותרת', label),
