@@ -396,6 +396,7 @@
   async function api(path, body = {}) {
     const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const data = await r.json().catch(() => ({}));
+    if (r.status === 401) location.href = `/login?next=${encodeURIComponent(location.pathname)}`;
     if (data.game) apply(data.game);
     return { ok: r.ok, data };
   }

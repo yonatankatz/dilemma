@@ -1,8 +1,9 @@
 'use strict';
 // Dilemma game server — zero dependencies, Node >= 18.
 //   /             phone voting screen (QR code target)
-//   /admin        admin: dilemmas, settings, new game           (HTTP Basic auth)
-//   /admin/host   the big screen that runs the game              (HTTP Basic auth)
+//   /admin        admin: dilemmas, settings, new game           (login required)
+//   /admin/host   the big screen that runs the game              (login required)
+//   /login        login page (signed "remember me" cookie; Basic auth also accepted for scripts)
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,6 +13,7 @@ const { Game } = require('./lib/game');
 const { JsonStore } = require('./lib/store');
 const { SseHub } = require('./lib/sse');
 const { DEFAULT_SETTINGS, SEED_DILEMMAS } = require('./lib/defaults');
+const { Auth, LoginLimiter } = require('./lib/auth');
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -34,6 +36,16 @@ if (!Array.isArray(dilemmas)) {
 }
 
 let settings = { ...DEFAULT_SETTINGS, ...store.read('settings.json', {}) };
+
+// Random signing secret, persisted so logins survive restarts and deploys.
+let authSecret = store.read('auth-secret.json', null)?.secret;
+if (!authSecret) {
+  authSecret = crypto.randomBytes(32).toString('hex');
+  store.write('auth-secret.json', { secret: authSecret });
+}
+const auth = new Auth({ user: ADMIN_USER, password: ADMIN_PASSWORD, secret: authSecret });
+const loginLimiter = new LoginLimiter();
+const SESSION_COOKIE = 'adm';
 
 const hub = new SseHub({
   public: (pid) => game.publicView(pid),
@@ -109,7 +121,7 @@ function participantId(req, res) {
   let id = parseCookies(req).pid;
   if (!id || !/^[a-f0-9]{32}$/.test(id)) {
     id = crypto.randomBytes(16).toString('hex');
-    const secure = req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
+    const secure = isHttps(req) ? '; Secure' : '';
     res.setHeader('Set-Cookie', `pid=${id}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax${secure}`);
   }
   return id;
@@ -153,20 +165,31 @@ function readJson(req, limit = 16 * 1024) {
   });
 }
 
-function safeEqual(a, b) {
-  const ha = crypto.createHash('sha256').update(String(a)).digest();
-  const hb = crypto.createHash('sha256').update(String(b)).digest();
-  return crypto.timingSafeEqual(ha, hb);
+function isAdmin(req) {
+  return auth.verify(parseCookies(req)[SESSION_COOKIE]) || auth.checkBasic(req.headers.authorization);
 }
 
-function isAdmin(req) {
-  if (!ADMIN_PASSWORD) return false;
-  const m = /^Basic (.+)$/.exec(req.headers.authorization || '');
-  if (!m) return false;
-  const [user, ...rest] = Buffer.from(m[1], 'base64').toString().split(':');
-  const userOk = safeEqual(user, ADMIN_USER);
-  const passOk = safeEqual(rest.join(':'), ADMIN_PASSWORD);
-  return userOk && passOk;
+const isHttps = (req) => req.headers['x-forwarded-proto'] === 'https';
+
+function setSessionCookie(req, res, value, maxAge) {
+  const parts = [`${SESSION_COOKIE}=${value}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
+  if (maxAge != null) parts.push(`Max-Age=${maxAge}`);
+  if (isHttps(req)) parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
+/** Client IP. Caddy (the only thing in front of us) sets X-Forwarded-For; the last entry is the one it saw. */
+function clientIp(req) {
+  const xff = (req.headers['x-forwarded-for'] || '').split(',').map((x) => x.trim()).filter(Boolean);
+  return xff[xff.length - 1] || req.socket.remoteAddress || '';
+}
+
+/** Only /admin paths are allowed as post-login destinations (no open redirect). */
+const safeNext = (v) => (typeof v === 'string' && /^\/admin(\/[\w./-]*)?$/.test(v) && !v.includes('..') ? v : '/admin');
+
+function redirect(res, location) {
+  res.writeHead(302, { Location: location, 'Cache-Control': 'no-store' });
+  res.end();
 }
 
 const MIME = {
@@ -245,11 +268,38 @@ async function handle(req, res) {
   }
   if (m === 'GET' && /^\/(css|js|vendor)\/[\w./-]+$/.test(p)) return serveStatic(res, p.slice(1));
 
-  // ----- admin + host (Basic auth) -----
+  // ----- login -----
+  if (m === 'GET' && p === '/login') {
+    if (isAdmin(req)) return redirect(res, safeNext(url.searchParams.get('next')));
+    return serveStatic(res, 'login.html');
+  }
+  if (m === 'POST' && p === '/api/login') {
+    const body = await readJson(req);
+    if (!auth.enabled) return sendJson(res, 503, { error: 'not_configured' });
+    const ip = clientIp(req);
+    if (loginLimiter.blocked(ip)) return sendJson(res, 429, { error: 'too_many_attempts' });
+    const password = typeof body.password === 'string' ? body.password : '';
+    if (!auth.checkCredentials(str(body.user, 100), password)) {
+      loginLimiter.fail(ip);
+      await new Promise((r) => setTimeout(r, 400));
+      return sendJson(res, 401, { error: 'bad_credentials' });
+    }
+    loginLimiter.success(ip);
+    const { token, maxAge } = auth.issue(body.remember !== false);
+    setSessionCookie(req, res, token, maxAge);
+    return sendJson(res, 200, { ok: true, next: safeNext(body.next) });
+  }
+  if (m === 'POST' && p === '/api/logout') {
+    await readJson(req);
+    setSessionCookie(req, res, '', 0);
+    return sendJson(res, 200, { ok: true });
+  }
+
+  // ----- admin + host (login required) -----
   if (p === '/admin' || p.startsWith('/admin/')) {
     if (!isAdmin(req)) {
-      res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="dilemma-admin", charset="UTF-8"', 'Content-Type': 'text/plain; charset=utf-8' });
-      return res.end(ADMIN_PASSWORD ? 'Unauthorized' : 'ADMIN_PASSWORD is not configured on the server');
+      if (m === 'GET' && !p.startsWith('/admin/api/')) return redirect(res, `/login?next=${encodeURIComponent(p)}`);
+      return sendJson(res, 401, { error: ADMIN_PASSWORD ? 'unauthorized' : 'not_configured' });
     }
     if (m === 'GET' && (p === '/admin' || p === '/admin/')) return serveStatic(res, 'admin.html');
     if (m === 'GET' && p === '/admin/host') return serveStatic(res, 'host.html');

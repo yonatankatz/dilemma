@@ -40,6 +40,10 @@
     transition: opacity .2s, transform .2s;
   }
   .item.off { opacity: .5; }
+  @media (max-width: 560px) {
+    .item { grid-template-columns: 34px 1fr; }
+    .item .tools { grid-column: 1 / -1; justify-content: flex-end; }
+  }
   .item .idx { font-family: var(--display); color: var(--gold); font-size: 1.3rem; text-align: center; }
   .item .text { font-weight: 700; font-size: 1.08rem; line-height: 1.4; }
   .item .opts { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; color: var(--muted); }
@@ -80,7 +84,10 @@
 <div class="wrap">
   <header>
     <h1 class="gold-text">ניהול המשחק</h1>
-    <a class="btn" href="/admin/host" target="_blank">🖥️ פתיחת מסך המשחק</a>
+    <div class="actions">
+      <a class="btn" href="/admin/host" target="_blank">🖥️ פתיחת מסך המשחק</a>
+      <button class="btn ghost" id="logout" type="button">יציאה</button>
+    </div>
   </header>
 
   <section class="panel">

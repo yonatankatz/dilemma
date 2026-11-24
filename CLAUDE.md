@@ -12,11 +12,13 @@ All UI text is Hebrew, RTL.
 | `app/lib/game.js` | The game **state machine** (pure logic, injectable clock). All rules live here. |
 | `app/lib/sse.js` | Server-Sent Events hub: per-client views, coalesced pushes. |
 | `app/lib/store.js` | JSON-file persistence (atomic tmp+rename, debounced writes). |
+| `app/lib/auth.js` | Admin login: signed session tokens, Basic-auth check, failed-login limiter. |
 | `app/lib/defaults.js` | Seed dilemmas + default settings (used only when the data dir is empty). |
 | `app/public/play.html`, `js/play.js` | Phone screen (`/`, the QR target). |
 | `app/public/host.html`, `js/host.js` | Game-runner big screen (`/admin/host`). |
 | `app/public/js/sound.js` | Procedural music + SFX (Web Audio, no audio files). Host screen only. |
 | `app/public/admin.html`, `js/admin.js` | Admin: dilemmas CRUD, settings, new/end game, CSV (`/admin`). |
+| `app/public/login.html`, `js/login.js` | Admin login page (`/login`, "remember me" checkbox). |
 | `app/public/css/theme.css` | Shared design tokens (colors, fonts, buttons, keyframes). |
 | `app/public/vendor/qrcode.js` | Vendored qrcode-generator (MIT). Bundled so events never depend on a CDN. |
 | `deploy/setup.sh` | Idempotent server install, run by CI on every deploy. |
@@ -43,7 +45,9 @@ Phases: `idle → lobby → vote → guess → results → (vote next | end)`.
 - Starting a new game archives the previous one to `$DATA_DIR/games/<id>.json`.
 
 Data on disk (`DATA_DIR`, default `app/data/`, prod `/var/lib/dilemma`): `dilemmas.json`, `settings.json`,
-`game.json` (live state, survives restarts), `games/*.json`.
+`game.json` (live state, survives restarts), `games/*.json`, `auth-secret.json` (session signing key).
+Deploys never touch this directory. `defaults.js` seeds only an empty one, so editing seeds does not change
+production: add dilemmas through `/admin` or `PUT /admin/api/dilemmas`.
 
 ## Conventions
 
@@ -58,8 +62,14 @@ Data on disk (`DATA_DIR`, default `app/data/`, prod `/var/lib/dilemma`): `dilemm
 - Palette: wine/bordeaux backgrounds, gold gradients, cream text. Fonts: Suez One (display) and Assistant
   (body). Option 1 is red, option 2 is gold, everywhere.
 - Every API POST/PUT requires `Content-Type: application/json`. This is also the CSRF guard for the
-  Basic-auth admin.
-- `/admin*` (admin + host + their APIs and SSE) uses HTTP Basic auth: user `admin`, password `ADMIN_PASSWORD`.
+  cookie-authenticated admin.
+- `/admin*` (admin + host + their APIs and SSE) requires login: user `admin`, password `ADMIN_PASSWORD`.
+  `/login` sets the `adm` cookie, an HMAC-signed expiry (1 year with "remember me", else a browser-session
+  cookie capped at 12h). The key mixes `auth-secret.json` with the credentials, so restarts and deploys keep
+  people logged in and changing `ADMIN_PASSWORD` logs everyone out. Unauthenticated pages redirect to
+  `/login?next=`; APIs return 401 JSON. A `Authorization: Basic` header is still accepted, for scripts and
+  for puppeteer (`page.setExtraHTTPHeaders`; `page.authenticate` no longer works, there is no 401 challenge).
+  Failed logins are limited to 10 per IP per 10 minutes.
 
 ## Verify a change
 

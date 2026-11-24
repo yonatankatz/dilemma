@@ -36,6 +36,7 @@
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     const data = await r.json().catch(() => ({}));
+    if (r.status === 401) location.href = `/login?next=${encodeURIComponent(location.pathname)}`;
     if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
     return data;
   }
@@ -219,6 +220,11 @@
 
   // ---------- boot ----------
   renderQr();
+  $('logout').addEventListener('click', async () => {
+    await fetch('/api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    location.href = '/login';
+  });
+
   api('GET', '/admin/api/dilemmas').then((d) => { dilemmas = d; renderList(); });
   api('GET', '/admin/api/settings').then(renderSettings);
   const es = new EventSource('/admin/api/events');

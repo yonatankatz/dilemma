@@ -10,7 +10,8 @@ then the results are revealed with animation and a breakdown by audience segment
 | `https://dilemma.yonatankatz.com/admin` | Admin: dilemmas, timers, breakdown questions, new game, CSV export |
 | `https://dilemma.yonatankatz.com/admin/host` | The big screen that runs the game (with music) |
 
-Admin and host use HTTP Basic auth: user `admin`, password from the `ADMIN_PASSWORD` secret.
+Admin and host require login at `/login` (remembered on the device for a year): user `admin`, password from
+the `ADMIN_PASSWORD` secret.
 
 ## Running a game
 
