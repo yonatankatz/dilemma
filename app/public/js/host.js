@@ -31,16 +31,37 @@
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const joinUrl = () => `${location.origin}/`;
 
-  /** Shrinks font-size until the text fits its box. */
-  function fitText(el, maxPx, minPx = 18) {
-    let size = maxPx;
-    el.style.fontSize = `${size}px`;
-    while (size > minPx && (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2)) {
-      size -= 2;
-      el.style.fontSize = `${size}px`;
+  /**
+   * Sets el's font-size to the largest value in [minPx, maxPx] for which fits() holds (binary search).
+   * Falls back to minPx. Children sized in em scale with it. Returns the chosen size.
+   */
+  function fitFont(el, minPx, maxPx, fits) {
+    const set = (px) => { el.style.fontSize = `${px.toFixed(2)}px`; };
+    set(maxPx);
+    if (fits()) return maxPx;
+    let lo = minPx;
+    let hi = maxPx;
+    for (let i = 0; i < 9 && hi - lo > 0.5; i++) {
+      const mid = (lo + hi) / 2;
+      set(mid);
+      if (fits()) lo = mid; else hi = mid;
     }
+    set(lo);
+    return lo;
   }
+  /**
+   * The children of `box` fit its height. Uses layout offsets rather than scrollHeight, because the
+   * entry animations (translateY) temporarily extend scrollHeight and would make text needlessly small.
+   */
+  const childrenFitHeight = (box) => {
+    const kids = [...box.children].filter((k) => k.offsetParent);
+    if (!kids.length) return true;
+    const last = kids[kids.length - 1];
+    return last.offsetTop + last.offsetHeight - box.offsetTop <= box.clientHeight + 1;
+  };
   const unit = () => Math.min(window.innerWidth / 100, window.innerHeight / 56.25);
+  /** Long texts get a compact layout. */
+  const isLong = (d) => d.text.length > 170 || d.option1.length + d.option2.length > 110;
 
   function qrSvg(text) {
     const qr = qrcode(0, 'M');
@@ -54,8 +75,8 @@
 
   function optionCards(d) {
     return h('div', { class: 'options' },
-      h('div', { class: 'opt' }, h('span', { class: 'badge o1' }, '1'), h('span', {}, d.option1)),
-      h('div', { class: 'opt' }, h('span', { class: 'badge o2' }, '2'), h('span', {}, d.option2)));
+      h('div', { class: 'opt' }, h('span', { class: 'badge o1' }, '1'), h('span', { class: 'otxt' }, d.option1)),
+      h('div', { class: 'opt' }, h('span', { class: 'badge o2' }, '2'), h('span', { class: 'otxt' }, d.option2)));
   }
 
   function splitBar(pct, showLabels = true) {
@@ -113,14 +134,27 @@
     const bar = ring.querySelector('.bar');
     const votedN = h('span', { class: 'n gold-text' }, String(st.votedCount));
     const votedOf = h('div', { class: 'label' }, `מתוך ${st.participants} הצביעו`);
-    const text = h('div', { class: 'dilemma-text' }, h('span', {}, d.text));
+    const span = h('span', {}, d.text);
+    const text = h('div', { class: 'dilemma-text' }, span);
+    const opts = optionCards(d);
+    const vbody = h('div', { class: 'vbody' }, text, opts);
 
-    const el = h('div', { class: 'screen vote' },
+    const el = h('div', { class: `screen vote${isLong(d) ? ' long' : ''}` },
       h('div', { class: 'head' }, h('div', { class: 'spacer' }), ring, h('div', { class: 'voted' }, votedN, votedOf)),
-      text,
-      optionCards(d));
+      vbody);
 
-    requestAnimationFrame(() => fitText(text, unit() * 6, unit() * 2.6));
+    // Options first (capped share of the height), then the text takes the rest. If the text can't fit
+    // even at its minimum, give it more room by shrinking the options further.
+    const fit = () => {
+      const u = unit();
+      const H = vbody.clientHeight;
+      const textFits = () => span.offsetHeight <= text.clientHeight + 1 && span.scrollWidth <= text.clientWidth + 1;
+      for (const share of [0.42, 0.34, 0.26]) {
+        fitFont(opts, u * 1.7, u * 3.2, () => opts.offsetHeight <= H * share);
+        fitFont(text, u * 1.5, u * 6, textFits);
+        if (textFits()) return;
+      }
+    };
 
     const total = st.voteSeconds * 1000;
     let lastSec = null;
@@ -153,6 +187,7 @@
     let lastVoted = st.votedCount;
     return {
       el,
+      fit,
       update(s) {
         votedOf.textContent = `מתוך ${s.participants} הצביעו`;
         if (s.votedCount !== lastVoted) {
@@ -174,11 +209,18 @@
         style: `left:${Math.random() * 100}%;font-size:calc(var(--u)*${size});animation-duration:${8 + Math.random() * 10}s;animation-delay:${-Math.random() * 14}s`,
       }, '?'));
     }
-    const el = h('div', { class: 'screen guess' },
+    const d = st.dilemma;
+    const opts = optionCards(d);
+    const gbody = h('div', { class: 'gbody' }, opts);
+    const el = h('div', { class: `screen guess${d.option1.length + d.option2.length > 110 ? ' long' : ''}` },
       marks,
       h('h1', { class: 'title gold-text' }, 'מה לדעתכם האחרים חשבו?'),
-      optionCards(st.dilemma));
-    return { el };
+      gbody);
+    const fit = () => {
+      const u = unit();
+      fitFont(opts, u * 1.7, u * 3, () => opts.offsetHeight <= gbody.clientHeight - u * 3 + 1);
+    };
+    return { el, fit };
   }
 
   function resultsScreen(fresh) {
@@ -220,15 +262,21 @@
     }
     bd.append(bdInner);
     el.append(h('div', { class: 'body' }, bars, bd));
-    // Shrink the breakdown font until every group fits the available height.
-    requestAnimationFrame(() => {
-      let size = unit() * 2.4;
-      bdInner.style.fontSize = `${size}px`;
-      while (size > 10 && bdInner.scrollHeight > bd.clientHeight) {
-        size -= 1;
-        bdInner.style.fontSize = `${size}px`;
-      }
-    });
+    // Size the option texts for the narrower split layout up front (measured with transitions off), so
+    // nothing re-wraps or jumps when the breakdown slides in. Then fit the breakdown panel itself.
+    const fit = () => {
+      const u = unit();
+      const hasBd = r.breakdown.length > 0;
+      const wasSplit = el.classList.contains('split');
+      el.classList.add('measure');
+      if (hasBd) el.classList.add('split');
+      // Height only: the crown badge may poke a little past the side of the % column, which is fine.
+      fitFont(bars, u * 0.45, u, () => childrenFitHeight(bars));
+      if (hasBd) fitFont(bdInner, u * 1.1, u * 2.4, () => bdInner.scrollHeight <= bd.clientHeight + 1);
+      if (!wasSplit) el.classList.remove('split');
+      void el.offsetWidth; // commit the un-split layout before transitions come back
+      el.classList.remove('measure');
+    };
 
     const setFinal = () => {
       for (const p of parts) {
@@ -297,15 +345,15 @@
         openBreakdown();
       })();
     }
-    return { el, destroy() { cancelled = true; } };
+    return { el, fit, destroy() { cancelled = true; } };
   }
 
   function endScreen(fresh) {
-    const summary = h('div', { class: 'summary' });
+    const summary = h('div', { class: `summary${(st.summary || []).length > 18 ? ' cols3' : ''}` });
     (st.summary || []).forEach((s, i) => {
       const sb = splitBar(s.pct);
       const row = h('div', { class: 'srow', style: `animation-delay:${0.6 + i * 0.12}s` },
-        h('div', { class: 't' }, h('b', { class: 'gold-text' }, String(i + 1)), '  ', s.text),
+        h('div', { class: 't' }, h('b', { class: 'gold-text' }, String(i + 1)), s.text.replace(/\s+/g, ' ')),
         s.total ? sb : h('div', { class: 'n' }, 'אין הצבעות'));
       summary.append(row);
       setTimeout(() => sb._set(), 900 + i * 120);
@@ -314,6 +362,10 @@
       h('h1', { class: 'title gold-text' }, 'המשחק הסתיים!'),
       h('p', { class: 'subtitle' }, 'תודה ששיחקתם 💛'),
       summary);
+    const fit = () => {
+      const u = unit();
+      fitFont(summary, u * 0.6, u, () => childrenFitHeight(summary));
+    };
     let confetti = null;
     if (fresh) {
       confetti = h('div', { class: 'confetti' });
@@ -328,7 +380,7 @@
       S.fanfare();
     }
     S.setMode('end');
-    return { el, destroy() { if (confetti) confetti.remove(); } };
+    return { el, fit, destroy() { if (confetti) confetti.remove(); } };
   }
 
   // ======================= rendering =======================
@@ -365,6 +417,7 @@
       }
       screen = build(st);
       stage.append(screen.el);
+      if (screen.fit) screen.fit();
       if (first && !unlocked) S.setMode(null);
     } else if (screen && screen.update) {
       screen.update(st);
@@ -459,11 +512,17 @@
     else if (e.key === 'f' || e.key === 'F') toggleFullscreen();
   });
 
-  // Keep the QR / text fitting when the window is resized (e.g. entering fullscreen)
-  window.addEventListener('resize', () => {
-    const t = stage.querySelector('.screen:not(.leaving) .dilemma-text');
-    if (t) fitText(t, unit() * 6.2, unit() * 2.6);
-  });
+  // Refit text when the window is resized (e.g. entering fullscreen) and when web fonts finish
+  // loading: a screen measured with fallback-font metrics would otherwise keep a wrong size.
+  // (document.fonts.ready can resolve before the first screen's fonts are even requested.)
+  let refitRaf = 0;
+  const refit = () => {
+    cancelAnimationFrame(refitRaf);
+    refitRaf = requestAnimationFrame(() => screen && screen.fit && screen.fit());
+  };
+  window.addEventListener('resize', refit);
+  document.fonts.addEventListener('loadingdone', refit);
+  document.fonts.ready.then(refit);
 
   const es = new EventSource('/admin/api/events');
   es.onmessage = (e) => apply(JSON.parse(e.data));

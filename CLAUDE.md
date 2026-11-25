@@ -59,6 +59,14 @@ production: add dilemmas through `/admin` or `PUT /admin/api/dilemmas`.
   `text-align`) or they render reversed.
 - Host screen sizing uses `--u` (≈1% of the short side of a 16:9 viewport). Keep content inside the
   safe area: chips occupy the top ~7u, the control bar the bottom ~11u.
+- Real dilemmas are long (up to ~400 chars with line breaks, options up to ~120 chars). Host text is never
+  a fixed size: each screen object exposes `fit()`, which uses `fitFont()` (binary search on font-size) so
+  text fills its box without overflowing. Blocks sized as a unit (`.options`, `.bars`, `.summary`) use `em`
+  inside, so scaling the container font scales everything. `fit()` runs on build, on resize, and when web
+  fonts finish loading (`document.fonts` `loadingdone`; `fonts.ready` alone resolves too early).
+  Measure with `offsetHeight`/`offsetTop`, not `scrollHeight`: entry animations (`translateY`) inflate
+  `scrollHeight`. Results are fitted in the split (breakdown open) layout up front, so nothing jumps.
+  Dilemma text keeps its line breaks (`white-space: pre-line`).
 - Palette: wine/bordeaux backgrounds, gold gradients, cream text. Fonts: Suez One (display) and Assistant
   (body). Option 1 is red, option 2 is gold, everywhere.
 - Every API POST/PUT requires `Content-Type: application/json`. This is also the CSRF guard for the
@@ -80,6 +88,10 @@ production: add dilemmas through `/admin` or `PUT /admin/api/dilemmas`.
    installed Chrome (`C:/Program Files/Google/Chrome/Application/chrome.exe`) and screenshots each phase at
    1600×900. Install puppeteer in a scratch directory, never in `app/`. A short `voteSeconds` in the scratch
    `settings.json` makes the timeout path quick to exercise.
+   For text layout, run every real dilemma (`GET /admin/api/dilemmas` from prod) through vote/guess/results
+   and the end screen at 1920×1080, 1366×768, 1280×720, 1024×768 and 1280×800, and check in-page for text
+   that is offscreen, clipped, overlapping another text block or the HUD, or below ~15px. Use one browser
+   per viewport: background tabs do not run `requestAnimationFrame`, so their refits never happen.
 
 ## Deployment
 
